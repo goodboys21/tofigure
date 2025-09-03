@@ -1,0 +1,14 @@
+{
+  "name": "photo-to-figure-converter",
+  "version": "1.0.0",
+  "description": "Backend proxy untuk Photo to Figure Style Converter",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  }
+}
