@@ -1,7 +1,9 @@
 import express from "express";
 import fetch from "node-fetch";
+import cors from "cors";
 
 const app = express();
+app.use(cors());
 
 app.get("/api/convert", async (req, res) => {
   try {
