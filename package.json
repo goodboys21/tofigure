@@ -1,11 +1,11 @@
 {
-  "name": "photo-to-figure-converter",
+  "name": "photo-to-figure-express",
   "version": "1.0.0",
-  "description": "Backend proxy untuk Photo to Figure Style Converter",
-  "main": "app.js",
+  "main": "api/app.js",
   "type": "module",
   "scripts": {
-    "start": "node app.js"
+    "start": "node api/app.js",
+    "dev": "vercel dev"
   },
   "dependencies": {
     "express": "^4.18.2",
