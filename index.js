@@ -9,47 +9,42 @@ const cors = require('cors');
 const app = express();
 const tmpDir = '/tmp';
 
-// === Enable CORS ===
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// === pastikan folder /tmp ada ===
-if (!fs.existsSync(tmpDir)) {
-  fs.mkdirSync(tmpDir, { recursive: true });
-}
+// pastikan folder /tmp ada
+if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 
-// === multer setup ===
 const upload = multer({ dest: tmpDir });
 
-// === Scrape API Key dari overchat.ai ===
+// --- Scrape API Key dari overchat.ai ---
 async function scrapeApiKey() {
-  const targetUrl = 'https://overchat.ai/image/ghibli';
-  const { data: htmlContent } = await axios.get(targetUrl, {
+  const { data: htmlContent } = await axios.get('https://overchat.ai/image/ghibli', {
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     },
   });
 
-  const apiKeyRegex = /const apiKey = '([^']+)'/;
-  const match = htmlContent.match(apiKeyRegex);
-
+  const match = htmlContent.match(/const apiKey = '([^']+)'/);
   if (match?.[1]) return match[1];
   throw new Error('API Key tidak ditemukan!');
 }
 
-// === Upload ke CloudGood ===
+// --- Upload ke CloudGood ---
 async function uploadToCloudGood(filePath) {
   const form = new FormData();
   form.append('file', fs.createReadStream(filePath));
+
   const { data } = await axios.post('https://cloudgood.xyz/upload.php', form, {
     headers: form.getHeaders(),
   });
+
   return data;
 }
 
-// === Endpoint API ===
+// --- Endpoint API ---
 app.post('/tofigure', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded!' });
@@ -60,39 +55,33 @@ app.post('/tofigure', upload.single('image'), async (req, res) => {
 
     const apiKey = await scrapeApiKey();
 
-    // pakai absolute path untuk read stream
-    const filePath = path.resolve(req.file.path);
-
+    // Prepare FormData untuk OpenAI
     const form = new FormData();
-    form.append('image', fs.createReadStream(filePath));
+    form.append('image', fs.createReadStream(req.file.path));
     form.append('prompt', prompt);
     form.append('model', 'gpt-image-1');
     form.append('n', 1);
     form.append('size', '1024x1024');
 
-    // kirim request ke OpenAI
     const response = await axios.post('https://api.openai.com/v1/images/edits', form, {
-      headers: {
-        ...form.getHeaders(),
-        Authorization: `Bearer ${apiKey}`,
-      },
-      maxBodyLength: Infinity,
+      headers: { ...form.getHeaders(), Authorization: `Bearer ${apiKey}` },
     });
 
     const result = response.data;
+
     if (!result?.data?.[0]?.b64_json)
       return res.status(500).json({ success: false, message: 'No image returned from API' });
 
-    // simpan sementara
+    // Simpan sementara
     const buffer = Buffer.from(result.data[0].b64_json, 'base64');
     const tmpOutput = path.join(tmpDir, `output-${Date.now()}.png`);
     fs.writeFileSync(tmpOutput, buffer);
 
-    // upload ke CloudGood
+    // Upload ke CloudGood
     const cloudResponse = await uploadToCloudGood(tmpOutput);
 
-    // hapus file sementara
-    fs.unlinkSync(filePath);
+    // Hapus file sementara
+    fs.unlinkSync(req.file.path);
     fs.unlinkSync(tmpOutput);
 
     return res.json({ success: true, message: 'Image converted successfully', result: cloudResponse });
@@ -102,6 +91,5 @@ app.post('/tofigure', upload.single('image'), async (req, res) => {
   }
 });
 
-// === Jalankan server ===
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
